@@ -16,8 +16,8 @@ The plugin reads `highway.getTime()`, `highway.getNotes()`, `highway.getChords()
 ### IV. DPR + Resize Aware
 Canvas `bottom` offset is recomputed on every `_fbResize` to track the controls bar (which flex-wraps to multiple rows on narrow viewports). DPR scaling is applied so notes are crisp on high-DPI displays.
 
-### V. Match Rocksmith String Colors
-String colors mirror Rocksmith's palette: low-E red, A yellow/gold, D blue, G orange, B green, high-e purple. Active notes use the brighter variant (`FB_STRING_BRIGHT`) plus a multi-layer glow.
+### V. Match the chart String Colors
+String colors mirror the chart's palette: low-E red, A yellow/gold, D blue, G orange, B green, high-e purple. Active notes use the brighter variant (`FB_STRING_BRIGHT`) plus a multi-layer glow.
 
 ## Inherits from Slopsmith Core Constitution
 

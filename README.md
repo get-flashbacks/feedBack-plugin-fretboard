@@ -5,7 +5,7 @@ A plugin for [Slopsmith](https://github.com/byrongamatos/slopsmith) that adds a 
 ## Features
 
 - **Live fretboard** — a horizontal fretboard appears below the highway, lighting up notes as they arrive
-- **String colors** — matches the Rocksmith color scheme (red, orange, blue, orange, green, purple)
+- **String colors** — matches the chart color scheme (red, orange, blue, orange, green, purple)
 - **Note glow** — active notes glow with a bright halo, fading through sustains
 - **Fret numbers** — each active note shows its fret number
 - **Full 24-fret range** — shows the entire fretboard with dot markers and double dots at 12th/24th

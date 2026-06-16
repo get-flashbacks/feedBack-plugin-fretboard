@@ -185,7 +185,7 @@ function _fbDraw() {
     for (let s = 0; s < FB_STRINGS; s++) {
         const y = padT + s * stringH;
         // String 0 = high e (top), string 5 = low E (bottom)
-        // But in Rocksmith, string 0 = low E. So reverse: draw index (FB_STRINGS-1-s)
+        // But in the chart, string 0 = low E. So reverse: draw index (FB_STRINGS-1-s)
         const rsString = FB_STRINGS - 1 - s;
         ctx.strokeStyle = FB_STRING_COLORS[rsString];
         ctx.lineWidth = 1 + s * 0.3;  // thicker for lower strings
@@ -227,7 +227,7 @@ function _fbDraw() {
 
     // Draw active notes
     for (const n of activeNotes) {
-        const rsString = n.s;  // Rocksmith string (0=low E)
+        const rsString = n.s;  // the chart string (0=low E)
         const fret = n.f;
         const drawString = FB_STRINGS - 1 - rsString;  // flip for display
 
