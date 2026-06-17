@@ -1,6 +1,6 @@
 # Slopsmith Plugin: Fretboard View
 
-A plugin for [Slopsmith](https://github.com/byrongamatos/slopsmith) that adds a visual guitar fretboard overlay to the player, showing active notes in real-time as they're played.
+A plugin for [Slopsmith](https://github.com/got-feedback/feedback) that adds a visual guitar fretboard overlay to the player, showing active notes in real-time as they're played.
 
 ## Features
 
@@ -15,7 +15,7 @@ A plugin for [Slopsmith](https://github.com/byrongamatos/slopsmith) that adds a 
 
 ```bash
 cd /path/to/slopsmith/plugins
-git clone https://github.com/byrongamatos/slopsmith-plugin-fretboard.git fretboard
+git clone https://github.com/got-feedback/feedback-plugin-fretboard.git fretboard
 docker compose restart
 ```
 
