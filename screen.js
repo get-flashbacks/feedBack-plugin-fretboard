@@ -309,6 +309,11 @@ function _fbGetActiveNotes(t, notes, chords) {
     return active;
 }
 
+// Node-only export hook for tests; browsers fall through to the hooks IIFE.
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { _fbGetActiveNotes };
+} else {
+
 // ── Hooks ───────────────────────────────────────────────────────────────
 
 (function() {
@@ -330,3 +335,5 @@ function _fbGetActiveNotes(t, notes, chords) {
         }
     };
 })();
+
+}
