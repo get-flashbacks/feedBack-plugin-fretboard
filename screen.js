@@ -19,6 +19,11 @@ const FB_STRING_BRIGHT = [
 const FB_DOT_FRETS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24];
 const FB_DOUBLE_DOT = [12, 24];
 
+// How long a chord diagram stays visible after its onset, independent of
+// any individual member note's sustain. Was 0.3s, which cut chords off
+// before players had time to read the shape (issue #2).
+const FB_CHORD_HOLD_S = 0.9;
+
 // ── Toggle ──────────────────────────────────────────────────────────────
 
 function _fbInjectButton() {
@@ -290,10 +295,14 @@ function _fbGetActiveNotes(t, notes, chords) {
     // Chord notes
     if (chords) {
         for (const c of chords) {
-            if (c.t <= t + window && c.t >= t - 0.3) {
+            if (c.t <= t + window) {
                 for (const cn of (c.notes || [])) {
                     const noteEnd = c.t + (cn.sus || 0);
-                    if (noteEnd >= t - window) {
+                    // Each member stays lit through its own sustain, then
+                    // holds for FB_CHORD_HOLD_S so the whole shape remains
+                    // readable rather than flashing off with unsustained
+                    // members after just the note window.
+                    if (noteEnd + FB_CHORD_HOLD_S >= t) {
                         let alpha = 1;
                         if (cn.sus > 0 && t > c.t) {
                             alpha = Math.max(0.3, 1 - (t - c.t) / cn.sus * 0.7);

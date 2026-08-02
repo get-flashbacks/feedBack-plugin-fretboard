@@ -59,16 +59,22 @@ test('chord notes within window are all included', () => {
     ]);
 });
 
-test('a chord well before the current time is excluded (0.3s lookback)', () => {
-    const chords = [{ t: 0.5, notes: [{ s: 0, f: 0 }] }];
+test('a chord well past its 0.9s hold is excluded', () => {
+    const chords = [{ t: 0.0, notes: [{ s: 0, f: 0 }] }];
     assert.deepEqual(mod._fbGetActiveNotes(1.0, null, chords), []);
 });
 
-test('individual chord-member sustain still governs member inclusion', () => {
-    // Chord onset within the 0.3s lookback gate; members have different sustains.
-    const chords = [{ t: 0.85, notes: [{ s: 0, f: 0, sus: 0 }, { s: 1, f: 1, sus: 2.0 }] }];
+test('a chord diagram stays visible for the full 0.9s hold', () => {
+    const chords = [{ t: 0.2, notes: [{ s: 0, f: 0 }] }];
     const active = mod._fbGetActiveNotes(1.0, null, chords);
-    // Only the long-sustain member should still be ringing at t=1.0.
+    assert.deepEqual(active, [{ s: 0, f: 0, alpha: 1 }]);
+});
+
+test('a member outlasts its 0.9s hold while a sustained member remains', () => {
+    // Both members onset at t=0; one has no sustain, the other rings for 5s.
+    const chords = [{ t: 0, notes: [{ s: 0, f: 0, sus: 0 }, { s: 1, f: 1, sus: 5.0 }] }];
+    const active = mod._fbGetActiveNotes(0.95, null, chords);
+    // The unsustained member's 0.9s hold has expired; the sustained one hasn't.
     assert.equal(active.length, 1);
     assert.equal(active[0].s, 1);
 });
