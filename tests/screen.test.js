@@ -84,3 +84,73 @@ test('combines standalone notes and chords in one active list', () => {
     const active = mod._fbGetActiveNotes(1.0, notes, chords);
     assert.equal(active.length, 2);
 });
+
+// Coverage for _fbCreateInstance: the multi-instance factory hosts like
+// splitscreen use to mount one fretboard overlay per panel, each bound to
+// its own container + highway (feedBack-plugin-splitscreen#17).
+function fakeContainer(w, h) {
+    return {
+        clientWidth: w, clientHeight: h,
+        appendChild() {},
+    };
+}
+
+function fakeCtx() {
+    return {
+        fillRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {},
+        arc() {}, fill() {}, fillText() {},
+    };
+}
+
+function withDom(fn) {
+    global.document = {
+        createElement: () => ({
+            style: {}, className: '', textContent: '', title: '', onclick: null,
+            appendChild() {}, remove() {},
+            getContext: fakeCtx,
+        }),
+    };
+    let rafCalls = 0;
+    global.requestAnimationFrame = () => { rafCalls++; return rafCalls; };
+    global.cancelAnimationFrame = () => {};
+    try {
+        return fn();
+    } finally {
+        delete global.document;
+        delete global.requestAnimationFrame;
+        delete global.cancelAnimationFrame;
+    }
+}
+
+test('_fbCreateInstance mounts an independent canvas per call, each reading its own highway', () => {
+    withDom(() => {
+        const hwA = { getTime: () => 1, getNotes: () => [], getChords: () => [] };
+        const hwB = { getTime: () => 2, getNotes: () => [], getChords: () => [] };
+        const a = mod._fbCreateInstance({ container: fakeContainer(800, 400), getHighway: () => hwA });
+        const b = mod._fbCreateInstance({ container: fakeContainer(400, 200), getHighway: () => hwB });
+        assert.notEqual(a.canvas, b.canvas);
+        a.destroy();
+        b.destroy();
+    });
+});
+
+test('_fbCreateInstance requires container and getHighway', () => {
+    withDom(() => {
+        assert.throws(() => mod._fbCreateInstance({ getHighway: () => ({}) }));
+        assert.throws(() => mod._fbCreateInstance({ container: fakeContainer(100, 100) }));
+    });
+});
+
+test('_fbCreateInstance.resize sizes the canvas from the container and bottomOffset', () => {
+    withDom(() => {
+        const container = fakeContainer(640, 300);
+        const inst = mod._fbCreateInstance({
+            container,
+            getHighway: () => ({ getTime: () => 0, getNotes: () => [], getChords: () => [] }),
+            bottomOffset: () => 42,
+        });
+        assert.equal(inst.canvas.width, 640);
+        assert.equal(inst.canvas.style.bottom, '42px');
+        inst.destroy();
+    });
+});
