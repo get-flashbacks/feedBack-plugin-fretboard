@@ -102,6 +102,11 @@ function fakeCtx() {
     };
 }
 
+// The fake rAF queues callbacks instead of invoking them, since `draw()`
+// reschedules itself (`rafId = requestAnimationFrame(draw)`) before doing
+// any drawing — calling back synchronously would recurse without bound.
+// `step()` runs exactly one pending frame so tests can assert on a single
+// draw pass.
 function withDom(fn) {
     global.document = {
         createElement: () => ({
@@ -110,11 +115,22 @@ function withDom(fn) {
             getContext: fakeCtx,
         }),
     };
-    let rafCalls = 0;
-    global.requestAnimationFrame = () => { rafCalls++; return rafCalls; };
-    global.cancelAnimationFrame = () => {};
+    let queue = [];
+    let nextId = 1;
+    global.requestAnimationFrame = (cb) => {
+        const id = nextId++;
+        queue.push({ id, cb });
+        return id;
+    };
+    global.cancelAnimationFrame = (id) => {
+        queue = queue.filter((frame) => frame.id !== id);
+    };
+    const step = () => {
+        const frame = queue.shift();
+        if (frame) frame.cb();
+    };
     try {
-        return fn();
+        return fn(step);
     } finally {
         delete global.document;
         delete global.requestAnimationFrame;
@@ -123,12 +139,20 @@ function withDom(fn) {
 }
 
 test('_fbCreateInstance mounts an independent canvas per call, each reading its own highway', () => {
-    withDom(() => {
-        const hwA = { getTime: () => 1, getNotes: () => [], getChords: () => [] };
-        const hwB = { getTime: () => 2, getNotes: () => [], getChords: () => [] };
+    withDom((step) => {
+        let aReads = 0, bReads = 0;
+        const hwA = { getTime: () => { aReads++; return 1; }, getNotes: () => [], getChords: () => [] };
+        const hwB = { getTime: () => { bReads++; return 2; }, getNotes: () => [], getChords: () => [] };
         const a = mod._fbCreateInstance({ container: fakeContainer(800, 400), getHighway: () => hwA });
         const b = mod._fbCreateInstance({ container: fakeContainer(400, 200), getHighway: () => hwB });
         assert.notEqual(a.canvas, b.canvas);
+
+        // One queued frame per instance at creation time (a's, then b's).
+        step();
+        step();
+        assert.equal(aReads, 1);
+        assert.equal(bReads, 1);
+
         a.destroy();
         b.destroy();
     });
@@ -136,8 +160,20 @@ test('_fbCreateInstance mounts an independent canvas per call, each reading its 
 
 test('_fbCreateInstance requires container and getHighway', () => {
     withDom(() => {
-        assert.throws(() => mod._fbCreateInstance({ getHighway: () => ({}) }));
-        assert.throws(() => mod._fbCreateInstance({ container: fakeContainer(100, 100) }));
+        assert.throws(
+            () => mod._fbCreateInstance({ getHighway: () => ({}) }),
+            /container is required/,
+        );
+        assert.throws(
+            () => mod._fbCreateInstance({ container: fakeContainer(100, 100) }),
+            /getHighway is required/,
+        );
+    });
+});
+
+test('_fbCreateInstance() with no arguments throws the container error, not a TypeError', () => {
+    withDom(() => {
+        assert.throws(() => mod._fbCreateInstance(), /container is required/);
     });
 });
 
@@ -150,7 +186,19 @@ test('_fbCreateInstance.resize sizes the canvas from the container and bottomOff
             bottomOffset: () => 42,
         });
         assert.equal(inst.canvas.width, 640);
+        assert.equal(inst.canvas.height, 120);  // 300 * 0.15 = 45, floored to 120
         assert.equal(inst.canvas.style.bottom, '42px');
+        inst.destroy();
+    });
+});
+
+test('_fbCreateInstance sizes the canvas to 15% of a tall container', () => {
+    withDom(() => {
+        const inst = mod._fbCreateInstance({
+            container: fakeContainer(640, 2000),
+            getHighway: () => ({ getTime: () => 0, getNotes: () => [], getChords: () => [] }),
+        });
+        assert.equal(inst.canvas.height, 300);
         inst.destroy();
     });
 });
