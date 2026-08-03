@@ -23,7 +23,7 @@ const FB_DOUBLE_DOT = [12, 24];
 // runs one independent highway per panel — can create their own via
 // window.createFretboardOverlay({ container, getHighway }), one per
 // panel, without touching any of this plugin's internal state.
-function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, onDismiss }) {
+function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, onDismiss } = {}) {
     if (!container) throw new Error('createFretboardOverlay: container is required');
     if (typeof getHighway !== 'function') throw new Error('createFretboardOverlay: getHighway is required');
     bottomOffset = bottomOffset || (() => 0);
@@ -274,6 +274,7 @@ if (typeof module !== 'undefined' && module.exports) {
 
 let _fbEnabled = false;
 let _fbInstance = null;
+let _fbOnResize = null;
 
 function _fbInjectButton() {
     const controls = document.getElementById('player-controls');
@@ -325,15 +326,16 @@ function _fbCreateCanvas() {
     });
 
     const onResize = () => _fbInstance && _fbInstance.resize();
-    _fbInstance._onResize = onResize;
+    _fbOnResize = onResize;
     window.addEventListener('resize', onResize);
 }
 
 function _fbRemoveCanvas() {
     if (_fbInstance) {
-        window.removeEventListener('resize', _fbInstance._onResize);
+        window.removeEventListener('resize', _fbOnResize);
         _fbInstance.destroy();
         _fbInstance = null;
+        _fbOnResize = null;
     }
 }
 

@@ -110,11 +110,15 @@ function withDom(fn) {
             getContext: fakeCtx,
         }),
     };
-    let rafCalls = 0;
-    global.requestAnimationFrame = () => { rafCalls++; return rafCalls; };
+    const rafQueue = [];
+    let rafId = 0;
+    global.requestAnimationFrame = (cb) => { rafId++; rafQueue.push(cb); return rafId; };
     global.cancelAnimationFrame = () => {};
+    function step() {
+        if (rafQueue.length) rafQueue.shift()();
+    }
     try {
-        return fn();
+        return fn(step);
     } finally {
         delete global.document;
         delete global.requestAnimationFrame;
@@ -123,12 +127,18 @@ function withDom(fn) {
 }
 
 test('_fbCreateInstance mounts an independent canvas per call, each reading its own highway', () => {
-    withDom(() => {
-        const hwA = { getTime: () => 1, getNotes: () => [], getChords: () => [] };
-        const hwB = { getTime: () => 2, getNotes: () => [], getChords: () => [] };
+    withDom((step) => {
+        let aCalled = false, bCalled = false;
+        const hwA = { getTime: () => { aCalled = true; return 1; }, getNotes: () => [], getChords: () => [] };
+        const hwB = { getTime: () => { bCalled = true; return 2; }, getNotes: () => [], getChords: () => [] };
         const a = mod._fbCreateInstance({ container: fakeContainer(800, 400), getHighway: () => hwA });
         const b = mod._fbCreateInstance({ container: fakeContainer(400, 200), getHighway: () => hwB });
         assert.notEqual(a.canvas, b.canvas);
+        step();
+        assert.ok(aCalled, 'instance A should read hwA');
+        assert.ok(!bCalled, 'instance A should not read hwB');
+        step();
+        assert.ok(bCalled, 'instance B should read hwB');
         a.destroy();
         b.destroy();
     });
@@ -136,8 +146,14 @@ test('_fbCreateInstance mounts an independent canvas per call, each reading its 
 
 test('_fbCreateInstance requires container and getHighway', () => {
     withDom(() => {
-        assert.throws(() => mod._fbCreateInstance({ getHighway: () => ({}) }));
-        assert.throws(() => mod._fbCreateInstance({ container: fakeContainer(100, 100) }));
+        assert.throws(
+            () => mod._fbCreateInstance({ getHighway: () => ({}) }),
+            { message: 'createFretboardOverlay: container is required' }
+        );
+        assert.throws(
+            () => mod._fbCreateInstance({ container: fakeContainer(100, 100) }),
+            { message: 'createFretboardOverlay: getHighway is required' }
+        );
     });
 });
 
@@ -151,6 +167,15 @@ test('_fbCreateInstance.resize sizes the canvas from the container and bottomOff
         });
         assert.equal(inst.canvas.width, 640);
         assert.equal(inst.canvas.style.bottom, '42px');
+        assert.equal(inst.canvas.height, 120);  // 300 * 0.15 = 45, clamped to 120 minimum
         inst.destroy();
+
+        const tall = fakeContainer(640, 1000);
+        const inst2 = mod._fbCreateInstance({
+            container: tall,
+            getHighway: () => ({ getTime: () => 0, getNotes: () => [], getChords: () => [] }),
+        });
+        assert.equal(inst2.canvas.height, 150);  // 1000 * 0.15 = 150 > 120 minimum
+        inst2.destroy();
     });
 });
