@@ -13,3 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Changed
 
 - The player's own "Fretboard" toggle now creates its single instance through the same factory. Its behavior is unchanged.
+
+### Fixed
+
+- The fretboard diagram no longer changes which string a note is shown on when the highway's own inversion (invert-highway plugin) is toggled — it now corrects for `highway.getInverted()` so displayed notes always reflect their true string.
