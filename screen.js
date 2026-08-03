@@ -23,10 +23,23 @@ const FB_DOUBLE_DOT = [12, 24];
 // runs one independent highway per panel — can create their own via
 // window.createFretboardOverlay({ container, getHighway }), one per
 // panel, without touching any of this plugin's internal state.
+//
+// Sizing: the canvas is sized to `container` only at creation and inside
+// the returned `resize()`. The factory has no ResizeObserver of its own —
+// hosts own layout, so hosts must call `instance.resize()` themselves
+// whenever their container's size changes (splitscreen calls it from its
+// own layout/window-resize handling; the player toggle below wires a
+// `window` resize listener for the same reason).
 function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, onDismiss } = {}) {
     if (!container) throw new Error('createFretboardOverlay: container is required');
     if (typeof getHighway !== 'function') throw new Error('createFretboardOverlay: getHighway is required');
-    bottomOffset = bottomOffset || (() => 0);
+    if (bottomOffset != null && typeof bottomOffset !== 'function') {
+        throw new Error('createFretboardOverlay: bottomOffset must be a function');
+    }
+    bottomOffset = bottomOffset == null ? (() => 0) : bottomOffset;
+    if (dismissible && onDismiss != null && typeof onDismiss !== 'function') {
+        throw new Error('createFretboardOverlay: onDismiss must be a function');
+    }
 
     let destroyed = false;
     let rafId = null;
@@ -40,6 +53,7 @@ function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, o
     let dismissBtn = null;
     if (dismissible) {
         dismissBtn = document.createElement('button');
+        dismissBtn.type = 'button';
         dismissBtn.className = 'fretboard-dismiss';
         dismissBtn.textContent = '✕';
         dismissBtn.title = 'Hide fretboard overlay';
@@ -49,7 +63,9 @@ function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, o
             'background:rgba(8,8,16,0.85);border:1px solid rgba(100,100,130,0.5);' +
             'border-radius:4px;color:#aaa;cursor:pointer;font-size:12px;' +
             'pointer-events:auto;';
-        dismissBtn.onclick = () => { if (onDismiss) onDismiss(); };
+        // Falls back to destroy() so a dismissible overlay is never inert
+        // when a host opts in without wiring its own onDismiss.
+        dismissBtn.onclick = () => { if (onDismiss) onDismiss(); else destroy(); };
         container.appendChild(dismissBtn);
     }
 
@@ -220,6 +236,9 @@ function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, o
     resize();
     rafId = requestAnimationFrame(draw);
 
+    // resize: host-driven — call whenever `container`'s size changes.
+    // destroy: idempotent — cancels the rAF loop and removes the canvas
+    // (and dismiss button, if any).
     return { canvas, resize, destroy };
 }
 

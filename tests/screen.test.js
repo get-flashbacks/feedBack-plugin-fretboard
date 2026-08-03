@@ -177,6 +177,33 @@ test('_fbCreateInstance() with no arguments throws the container error, not a Ty
     });
 });
 
+test('_fbCreateInstance rejects a non-function bottomOffset', () => {
+    withDom(() => {
+        assert.throws(
+            () => mod._fbCreateInstance({
+                container: fakeContainer(100, 100),
+                getHighway: () => ({}),
+                bottomOffset: 1,
+            }),
+            /bottomOffset must be a function/,
+        );
+    });
+});
+
+test('_fbCreateInstance rejects a non-function onDismiss when dismissible', () => {
+    withDom(() => {
+        assert.throws(
+            () => mod._fbCreateInstance({
+                container: fakeContainer(100, 100),
+                getHighway: () => ({}),
+                dismissible: true,
+                onDismiss: 'nope',
+            }),
+            /onDismiss must be a function/,
+        );
+    });
+});
+
 test('_fbCreateInstance.resize sizes the canvas from the container and bottomOffset', () => {
     withDom(() => {
         const container = fakeContainer(640, 300);
