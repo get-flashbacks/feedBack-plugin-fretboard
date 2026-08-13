@@ -182,16 +182,10 @@ function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, o
         const notes = hw.getNotes();
         const chords = hw.getChords();
         const activeNotes = _fbGetActiveNotes(t, notes, chords);
-        // The highway's own visual inversion (Invert Highway plugin) is a
-        // display-only flip of its note stacking order — it doesn't change
-        // which physical string a note belongs to. Undo it here so the
-        // fretboard diagram always reflects the true string regardless of
-        // the highway's inverted state.
-        const inverted = typeof hw.getInverted === 'function' && hw.getInverted();
 
         // Draw active notes
         for (const n of activeNotes) {
-            const rsString = inverted ? FB_STRINGS - 1 - n.s : n.s;  // the chart string (0=low E)
+            const rsString = n.s;  // the chart string (0=low E)
             const fret = n.f;
             const drawString = FB_STRINGS - 1 - rsString;  // flip for display
 
