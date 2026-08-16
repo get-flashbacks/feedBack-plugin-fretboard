@@ -30,6 +30,8 @@ jobs:
         uses: pullfrog/pullfrog@3f2ce4a0e1b5a7d8c9e0f1a2b3c4d5e6f7a8b9c0 # v0
         with:
           prompt: ${{ inputs.prompt }}
+          push: disabled
+          shell: restricted
         env:
           # add at least one provider API key
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
