@@ -59,18 +59,27 @@ test('chord notes within window are all included', () => {
     ]);
 });
 
-test('a chord well before the current time is excluded (0.3s lookback)', () => {
-    const chords = [{ t: 0.5, notes: [{ s: 0, f: 0 }] }];
+test('a chord well before the current time is excluded (0.9s hold)', () => {
+    const chords = [{ t: 0.05, notes: [{ s: 0, f: 0 }] }];
     assert.deepEqual(mod._fbGetActiveNotes(1.0, null, chords), []);
 });
 
+test('a chord shape is held on the fretboard well past its onset (issue #2/#3)', () => {
+    // Onset at t=0.5, no sustain on the member notes: previously this would
+    // have faded out by t=0.8 (300ms lookback); now it should still be lit
+    // most of the way to a full second later.
+    const chords = [{ t: 0.5, notes: [{ s: 0, f: 0, sus: 0 }] }];
+    const active = mod._fbGetActiveNotes(1.3, null, chords);
+    assert.equal(active.length, 1);
+    assert.ok(active[0].alpha >= 0.45);
+});
+
 test('individual chord-member sustain still governs member inclusion', () => {
-    // Chord onset within the 0.3s lookback gate; members have different sustains.
+    // Chord onset within the 0.9s hold gate; members have different sustains.
     const chords = [{ t: 0.85, notes: [{ s: 0, f: 0, sus: 0 }, { s: 1, f: 1, sus: 2.0 }] }];
     const active = mod._fbGetActiveNotes(1.0, null, chords);
-    // Only the long-sustain member should still be ringing at t=1.0.
-    assert.equal(active.length, 1);
-    assert.equal(active[0].s, 1);
+    // Both members are still within the chord's hold/sustain window at t=1.0.
+    assert.equal(active.length, 2);
 });
 
 test('handles missing notes/chords gracefully', () => {

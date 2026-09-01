@@ -262,16 +262,20 @@ function _fbGetActiveNotes(t, notes, chords) {
         }
     }
 
-    // Chord notes
+    // Chord notes. CHORD_HOLD_S keeps a struck chord's shape on the
+    // fretboard well past its literal onset (issues #2/#3: the shape used
+    // to vanish after ~300ms, too fast for a player to read and form).
+    const CHORD_HOLD_S = 0.9;
     if (chords) {
         for (const c of chords) {
-            if (c.t <= t + window && c.t >= t - 0.3) {
+            if (c.t <= t + window && c.t >= t - CHORD_HOLD_S) {
                 for (const cn of (c.notes || [])) {
-                    const noteEnd = c.t + (cn.sus || 0);
+                    const noteEnd = c.t + Math.max(cn.sus || 0, CHORD_HOLD_S);
                     if (noteEnd >= t - window) {
                         let alpha = 1;
-                        if (cn.sus > 0 && t > c.t) {
-                            alpha = Math.max(0.3, 1 - (t - c.t) / cn.sus * 0.7);
+                        const holdEnd = c.t + Math.max(cn.sus || 0, CHORD_HOLD_S);
+                        if (t > c.t) {
+                            alpha = Math.max(0.45, 1 - (t - c.t) / (holdEnd - c.t) * 0.55);
                         }
                         active.push({ s: cn.s, f: cn.f, alpha });
                     }
