@@ -60,8 +60,9 @@ test('chord notes within window are all included', () => {
 });
 
 test('a chord well before the current time is excluded (0.9s hold)', () => {
+    // 0.05 + 0.9s hold + the 80ms trailing grace window all elapsed by t=1.2.
     const chords = [{ t: 0.05, notes: [{ s: 0, f: 0 }] }];
-    assert.deepEqual(mod._fbGetActiveNotes(1.0, null, chords), []);
+    assert.deepEqual(mod._fbGetActiveNotes(1.2, null, chords), []);
 });
 
 test('a chord shape is held on the fretboard well past its onset (issue #2/#3)', () => {
@@ -80,6 +81,16 @@ test('individual chord-member sustain still governs member inclusion', () => {
     const active = mod._fbGetActiveNotes(1.0, null, chords);
     // Both members are still within the chord's hold/sustain window at t=1.0.
     assert.equal(active.length, 2);
+});
+
+test('a chord member sustained past CHORD_HOLD_S stays lit for its full sustain, not just 0.9s (CodeRabbit finding)', () => {
+    // Onset at t=0, one short member (sus:0) and one long-sustain member
+    // (sus:2.0). At t=1.5 — past the flat 0.9s hold — the long member must
+    // still be active; only the short one has genuinely ended.
+    const chords = [{ t: 0, notes: [{ s: 0, f: 0, sus: 0 }, { s: 1, f: 1, sus: 2.0 }] }];
+    const active = mod._fbGetActiveNotes(1.5, null, chords);
+    assert.equal(active.length, 1);
+    assert.equal(active[0].s, 1);
 });
 
 test('handles missing notes/chords gracefully', () => {

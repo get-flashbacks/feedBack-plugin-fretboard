@@ -268,12 +268,20 @@ function _fbGetActiveNotes(t, notes, chords) {
     const CHORD_HOLD_S = 0.9;
     if (chords) {
         for (const c of chords) {
-            if (c.t <= t + window && c.t >= t - CHORD_HOLD_S) {
+            // Gate on the chord's longest member end, not a flat
+            // CHORD_HOLD_S — otherwise a member sustained past 0.9s (e.g.
+            // sus: 2) was dropped by this outer check before its own
+            // per-member noteEnd below ever got a chance to keep it lit.
+            let chordEnd = c.t + CHORD_HOLD_S;
+            for (const cn of (c.notes || [])) {
+                const end = c.t + (cn.sus || 0);
+                if (end > chordEnd) chordEnd = end;
+            }
+            if (c.t <= t + window && chordEnd >= t - window) {
                 for (const cn of (c.notes || [])) {
-                    const noteEnd = c.t + Math.max(cn.sus || 0, CHORD_HOLD_S);
-                    if (noteEnd >= t - window) {
+                    const holdEnd = c.t + Math.max(cn.sus || 0, CHORD_HOLD_S);
+                    if (holdEnd >= t - window) {
                         let alpha = 1;
-                        const holdEnd = c.t + Math.max(cn.sus || 0, CHORD_HOLD_S);
                         if (t > c.t) {
                             alpha = Math.max(0.45, 1 - (t - c.t) / (holdEnd - c.t) * 0.55);
                         }
