@@ -249,3 +249,65 @@ test('_fbCreateInstance sizes the canvas to 15% of a tall container', () => {
         inst.destroy();
     });
 });
+
+// Coverage for issue #60/#19: the overlay used to hardcode a 6-string grid
+// (FB_STRINGS = 6) and map chart string indices straight onto it, putting
+// bass (4-string) and extended-range (7/8-string) charts' highlighted notes
+// on the wrong row entirely, since their string indices don't fit a 6-row
+// array. _fbStringCount()/_fbStringNames() are the fix's pure building
+// blocks — draw() now derives the grid from these instead of a constant.
+
+test('_fbStringCount reads getStringCount() from the highway', () => {
+    assert.equal(mod._fbStringCount({ getStringCount: () => 4 }), 4);
+    assert.equal(mod._fbStringCount({ getStringCount: () => 7 }), 7);
+    assert.equal(mod._fbStringCount({ getStringCount: () => 8 }), 8);
+});
+
+test('_fbStringCount falls back to 6 when the highway has no getStringCount()', () => {
+    assert.equal(mod._fbStringCount({}), 6);
+});
+
+test('_fbStringCount falls back to 6 for a non-positive-integer result (older/broken host)', () => {
+    assert.equal(mod._fbStringCount({ getStringCount: () => 0 }), 6);
+    assert.equal(mod._fbStringCount({ getStringCount: () => -1 }), 6);
+    assert.equal(mod._fbStringCount({ getStringCount: () => NaN }), 6);
+    assert.equal(mod._fbStringCount({ getStringCount: () => 4.5 }), 6);
+    assert.equal(mod._fbStringCount({ getStringCount: () => null }), 6);
+});
+
+test('_fbStringNames returns real note names for 6-string guitar and 4-string bass', () => {
+    assert.deepEqual(mod._fbStringNames(6), ['e', 'B', 'G', 'D', 'A', 'E']);
+    assert.deepEqual(mod._fbStringNames(4), ['G', 'D', 'A', 'E']);
+});
+
+test('_fbStringNames falls back to numeric labels for uncommon string counts, high-to-low by display row', () => {
+    // Row 0 (top, display) must be the highest-numbered chart string, same
+    // convention real-named tunings use — never guess a wrong note name for
+    // a tuning this plugin doesn't have a confident name table for.
+    assert.deepEqual(mod._fbStringNames(7), ['7', '6', '5', '4', '3', '2', '1']);
+    assert.deepEqual(mod._fbStringNames(5), ['5', '4', '3', '2', '1']);
+    assert.equal(mod._fbStringNames(7).length, 7);
+});
+
+test('draw() reads the highway\'s real string count instead of assuming 6', () => {
+    withDom((step) => {
+        let calls = 0;
+        const hw = {
+            getStringCount: () => { calls++; return 4; }, // 4-string bass
+            getTime: () => 0, getNotes: () => [], getChords: () => [],
+        };
+        const inst = mod._fbCreateInstance({ container: fakeContainer(640, 300), getHighway: () => hw });
+        step(); // run the first queued draw() frame
+        assert.ok(calls >= 1, 'draw() must consult getStringCount() on the bound highway');
+        inst.destroy();
+    });
+});
+
+test('draw() does not throw when the highway has no getStringCount (older host)', () => {
+    withDom((step) => {
+        const hw = { getTime: () => 0, getNotes: () => [], getChords: () => [] };
+        const inst = mod._fbCreateInstance({ container: fakeContainer(640, 300), getHighway: () => hw });
+        assert.doesNotThrow(() => step());
+        inst.destroy();
+    });
+});
