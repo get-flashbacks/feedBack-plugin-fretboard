@@ -1,16 +1,44 @@
 // Fretboard View plugin
 // Draws a horizontal guitar fretboard that lights up with active notes.
 
-const FB_STRINGS = 6;
+// Default when the host highway doesn't expose getStringCount() (older
+// host) — see _fbStringCount() below, which is what draw() actually uses.
+const FB_STRINGS_DEFAULT = 6;
 const FB_FRETS = 24;
+// Sized for up to 8 strings (extended-range GP imports) — issue #60/#19:
+// this used to hardcode 6 and silently misalign bass (4-string) and
+// 7/8-string charts, whose note string indices go out of range of a
+// 6-entry array.
 const FB_STRING_COLORS = [
     '#cc0000', '#cca800', '#0066cc',
     '#cc6600', '#00cc66', '#9900cc',
+    '#cc0099', '#00cccc',
 ];
 const FB_STRING_BRIGHT = [
     '#ff4444', '#ffe050', '#4499ff',
     '#ff9944', '#44ff99', '#cc44ff',
+    '#ff44cc', '#44cccc',
 ];
+// String-name labels, indexed by display row (row 0 = top = highest-pitch
+// string), for tunings we can confidently name. Only standard 6-string
+// guitar and 4-string bass are covered — everything else (5-string bass,
+// 7/8-string guitar, alternate tunings) falls back to a numeric label in
+// _fbStringNames() rather than guess a wrong note name.
+const FB_STRING_NAMES_BY_COUNT = {
+    4: ['G', 'D', 'A', 'E'],
+    6: ['e', 'B', 'G', 'D', 'A', 'E'],
+};
+function _fbStringNames(n) {
+    return FB_STRING_NAMES_BY_COUNT[n] || Array.from({ length: n }, (_, i) => String(n - i));
+}
+// The chart's real string count for this instance's highway — 4 for bass,
+// 6 for guitar, 7/8 for extended-range GP imports (see host CLAUDE.md's
+// getStringCount() docs). Cheap property read, safe to call every frame;
+// falls back to FB_STRINGS_DEFAULT for a host too old to expose it.
+function _fbStringCount(hw) {
+    const n = typeof hw.getStringCount === 'function' ? hw.getStringCount() : null;
+    return Number.isInteger(n) && n > 0 ? n : FB_STRINGS_DEFAULT;
+}
 const FB_DOT_FRETS = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24];
 const FB_DOUBLE_DOT = [12, 24];
 
@@ -89,12 +117,21 @@ function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, o
         ctx.fillStyle = 'rgba(8, 8, 16, 0.92)';
         ctx.fillRect(0, 0, W, H);
 
+        // Resolve the highway (and its real string count) before laying out
+        // geometry — issue #60/#19: string count varies per chart (4 for
+        // bass, 6 for guitar, 7/8 for extended-range GP imports), so it
+        // can't be a fixed constant. Falls back to the 6-string default
+        // when no highway is bound yet, so an empty board still renders.
+        const hw = getHighway();
+        const stringCount = hw ? _fbStringCount(hw) : FB_STRINGS_DEFAULT;
+        const stringNames = _fbStringNames(stringCount);
+
         const padL = 35;  // space for string labels
         const padR = 10;
         const padT = 10;
         const padB = 20;  // space for fret numbers
         const fretW = (W - padL - padR) / FB_FRETS;
-        const stringH = (H - padT - padB) / (FB_STRINGS - 1);
+        const stringH = (H - padT - padB) / (stringCount - 1);
 
         // Draw fret lines
         ctx.strokeStyle = '#2a2a40';
@@ -103,7 +140,7 @@ function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, o
             const x = padL + f * fretW;
             ctx.beginPath();
             ctx.moveTo(x, padT);
-            ctx.lineTo(x, padT + (FB_STRINGS - 1) * stringH);
+            ctx.lineTo(x, padT + (stringCount - 1) * stringH);
             ctx.stroke();
 
             // Nut (thicker at fret 0)
@@ -112,7 +149,7 @@ function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, o
                 ctx.lineWidth = 3;
                 ctx.beginPath();
                 ctx.moveTo(x, padT);
-                ctx.lineTo(x, padT + (FB_STRINGS - 1) * stringH);
+                ctx.lineTo(x, padT + (stringCount - 1) * stringH);
                 ctx.stroke();
                 ctx.strokeStyle = '#2a2a40';
                 ctx.lineWidth = 1;
@@ -137,12 +174,12 @@ function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, o
         }
 
         // Draw strings
-        for (let s = 0; s < FB_STRINGS; s++) {
+        for (let s = 0; s < stringCount; s++) {
             const y = padT + s * stringH;
-            // String 0 = high e (top), string 5 = low E (bottom)
-            // But in the chart, string 0 = low E. So reverse: draw index (FB_STRINGS-1-s)
-            const rsString = FB_STRINGS - 1 - s;
-            ctx.strokeStyle = FB_STRING_COLORS[rsString];
+            // Row 0 = highest-pitch string (top), last row = lowest (bottom).
+            // Chart string 0 = lowest pitch, so reverse: draw index (stringCount-1-s)
+            const rsString = stringCount - 1 - s;
+            ctx.strokeStyle = FB_STRING_COLORS[rsString % FB_STRING_COLORS.length];
             ctx.lineWidth = 1 + s * 0.3;  // thicker for lower strings
             ctx.globalAlpha = 0.4;
             ctx.beginPath();
@@ -159,24 +196,22 @@ function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, o
         ctx.textBaseline = 'top';
         for (let f = 1; f <= FB_FRETS; f++) {
             const x = padL + (f - 0.5) * fretW;
-            ctx.fillText(f, x, padT + (FB_STRINGS - 1) * stringH + 5);
+            ctx.fillText(f, x, padT + (stringCount - 1) * stringH + 5);
         }
 
         // String names
         ctx.textAlign = 'right';
         ctx.textBaseline = 'middle';
         ctx.font = 'bold 10px sans-serif';
-        const stringNames = ['e', 'B', 'G', 'D', 'A', 'E'];
-        for (let s = 0; s < FB_STRINGS; s++) {
+        for (let s = 0; s < stringCount; s++) {
             const y = padT + s * stringH;
-            const rsString = FB_STRINGS - 1 - s;
-            ctx.fillStyle = FB_STRING_COLORS[rsString];
+            const rsString = stringCount - 1 - s;
+            ctx.fillStyle = FB_STRING_COLORS[rsString % FB_STRING_COLORS.length];
             ctx.fillText(stringNames[s], padL - 8, y);
         }
 
         // Get active notes from THIS instance's highway, not a global one —
         // splitscreen panels each run their own independent highway.
-        const hw = getHighway();
         if (!hw) return;
         const t = hw.getTime();
         const notes = hw.getNotes();
@@ -185,9 +220,9 @@ function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, o
 
         // Draw active notes
         for (const n of activeNotes) {
-            const rsString = n.s;  // the chart string (0=low E)
+            const rsString = n.s;  // the chart string (0=lowest pitch)
             const fret = n.f;
-            const drawString = FB_STRINGS - 1 - rsString;  // flip for display
+            const drawString = stringCount - 1 - rsString;  // flip for display
 
             const y = padT + drawString * stringH;
             let x;
@@ -197,7 +232,7 @@ function _fbCreateInstance({ container, getHighway, bottomOffset, dismissible, o
                 x = padL + (fret - 0.5) * fretW;
             }
 
-            const color = FB_STRING_BRIGHT[rsString] || '#fff';
+            const color = FB_STRING_BRIGHT[rsString % FB_STRING_BRIGHT.length] || '#fff';
             const alpha = n.alpha || 1;
 
             // Glow
@@ -298,7 +333,7 @@ function _fbGetActiveNotes(t, notes, chords) {
 
 // Node-only export hook for tests; browsers fall through to the hooks IIFE.
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { _fbGetActiveNotes, _fbCreateInstance };
+    module.exports = { _fbGetActiveNotes, _fbCreateInstance, _fbStringCount, _fbStringNames };
 } else {
 
 // ── Player toggle (single global instance, anchored to #player) ────────
